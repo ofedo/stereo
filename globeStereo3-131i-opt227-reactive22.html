@@ -1,0 +1,613 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+		<title>3D Globe with Map Image in WebGL using Three.js | TechSlides</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+
+		<script type="text/javascript" src="ccapture.js-master/build/CCapture.all.min.js"></script>
+
+	</head>
+	<body>
+
+		<input type="file" id="open-file"></input>
+		<button id="play">PLAY</button>
+		<input type="checkbox" id="capture">capture</input>
+		<button id="stop">STOP</button>
+		<div id="container"></div>
+
+		<script src="d3.v3.min.js"></script>
+
+		<script src="../three.js/build/three.min.js"></script>
+		<script src="../three.js/examples/js/renderers/CanvasRenderer.js"></script>
+		<script src="../three.js/examples/js/renderers/Projector.js"></script>
+		<script src="../three.js/examples/js/controls/OrbitControls.js"></script>
+		<!-- <script src="StereoEffect.js"></script> -->
+		<script src="../three.js/examples/js/controls/DeviceOrientationControls.js"></script>
+
+		<script src="./THREE.MeshLine-master/src/THREE.MeshLine.js"></script>
+
+		<script type="text/javascript" src="./jquery-1.9.1.js"></script>
+
+		<script>
+
+var audioArrayBuffer;
+
+var off = 0;
+var offAnim = 0;
+var gain = 100;
+
+			$(window).load(function(){
+					document.getElementById("stop").onclick = function(evt) {
+						source.stop();
+
+						if (document.getElementById("capture").checked) {
+							capturer.save();
+							capturer.stop();
+						}
+					}
+
+					document.getElementById("play").onclick = function(evt) {
+						playSound(audioArrayBuffer.slice(0));
+
+						if (document.getElementById("capture").checked) {
+							// renderer.setSize(3840, 2160);
+							capturer.start();
+						}
+					}
+
+						document.getElementById("open-file").onchange = function(evt) {
+						  var file = evt.target.files[0];
+						  var reader = new FileReader();
+						  reader.onload = function(e) {
+								audioArrayBuffer = e.target.result;;
+						  }
+						  reader.readAsArrayBuffer(file);
+						}
+
+function playSound(arraybuffer) {
+  var AudioContext = window.AudioContext || window.webkitAudioContext;
+  context = new AudioContext();
+	source = context.createBufferSource();
+  context.decodeAudioData(arraybuffer, function(buffer) {
+    source.buffer = buffer;
+  });
+
+  var analyser = context.createAnalyser();
+  analyser.smoothingTimeConstant = 0.3;
+  analyser.fftSize = 1024;
+
+  jsNode = context.createScriptProcessor(2048, 1, 1);
+  jsNode.onaudioprocess = function() {
+    var array = new Uint8Array(analyser.frequencyBinCount);
+    analyser.getByteFrequencyData(array);
+
+    var file = document.getElementById("open-file").files;
+
+    if (file.length) {
+      // document.getElementById("open-file").style.display = 'none';
+
+// console.log(Math.floor(Math.average(array)));
+// off = Math.floor(Math.average(array));
+// offAnim = Math.floor(Math.average(array));
+// rangeStep = Math.floor(Math.average(array));
+// size = Math.min(20, Math.floor(Math.average(array)));
+// controls.autoRotateSpeed = 50 - Math.floor(Math.average(array)) / 1;
+gain = Math.average(array);
+// if (gain < 50) {
+// renderer.clear();
+// }
+    }
+  }
+
+  source.connect(analyser);
+  source.connect(context.destination);
+  jsNode.connect(context.destination);
+  analyser.connect(jsNode);
+
+	source.start();
+}
+
+Math.average = function(arguments) {
+  var numbers;
+  if (arguments[0] instanceof Array) {
+    numbers = arguments[0];
+  } else if (typeof arguments[0] == "number") {
+    numbers = arguments;
+  }
+  var sum = 0;
+  var average = 0;
+  if (numbers) {
+    for (var i = 0; i < numbers.length; i++) {
+      sum += numbers[i];
+    }
+    average = sum / numbers.length;
+    return average;
+  } else {
+    return 0;
+  }
+}
+
+			});
+
+
+
+
+			var canvas, context;
+			var container;
+			var camera, scene, renderer;
+			var group;
+			var mouseX = 0, mouseY = 0, mouseWheel = 0;
+			var controls;
+
+			var windowHalfX = window.innerWidth / 2;
+			var windowHalfY = window.innerHeight / 2;
+
+			var mesh2Arr = [];
+			var geometry, geometry2;
+
+var numChildren = 3;
+var index = 0;
+			//
+			// var textureLoader = new THREE.TextureLoader()
+			// 	.setPath( 'img/' )
+			// 	.load( [
+			// 		'crystalsnew20ii.gif'
+			// 	] );
+			// textureLoader.minFilter = THREE.LinearFilter;
+			//
+			// var textureLoader2 = new THREE.CubeTextureLoader()
+			// 	.setPath( 'img/' )
+			// 	.load( [
+			// 		'crystalsnew20ii.gif',
+			// 		'crystalsnew20ii.gif',
+			// 		'crystalsnew20ii.gif',
+			// 		'crystalsnew20ii.gif',
+			// 		'crystalsnew20ii.gif',
+			// 		'crystalsnew20ii.gif'
+			// 	] );
+			// textureLoader2.minFilter = THREE.LinearFilter;
+
+
+			var imgPath = "img/bff.png";
+			//
+			var texture = THREE.ImageUtils.loadTexture(imgPath);
+			// // texture.minFilter = THREE.LinearFilter; // disables gif animation
+			//
+			// var urls = [
+			// 	imgPath,
+			// 	imgPath,
+			// 	imgPath,
+			// 	imgPath,
+			// 	imgPath,
+			// 	imgPath
+			// ];
+			// var textureCube = THREE.ImageUtils.loadTextureCube(urls);
+			// textureCube.minFilter = THREE.LinearFilter;
+
+
+			// var materialTextured = new THREE.MeshBasicMaterial( {
+			// 	color: 0x000000,
+			// 	transparent: true,
+			// 	opacity:0.5,
+			// 	// alphaMap: textureLoader,
+			// 	// envMap: textureLoader2
+			// 	// map: texture,
+			// 	alphaMap: texture,
+			// 	// envMap: textureCube,
+			// 	// side: THREE.DoubleSide
+			// });
+
+			var maxRadius = 30;
+			var minRadius = 10;
+			var radiusStep = 4;
+			var radius = maxRadius;//(maxRadius;// - minRadius) / 2;
+
+			var frame = 0;
+			var frames = 1000;
+
+			// Create a capturer that exports an animated GIF
+			// Notices you have to specify the path to the gif.worker.js
+			var capturer = new CCapture({
+				format: 'png',
+				quality: 100,
+				// motionBlurFrames: 3,
+				workersPath: 'ccapture.js-master/src/',
+				workers: 10,
+				framerate: 30,
+				// verbose: true,
+				// display: true,
+				name: "ccapture01fed8o"
+
+				// timeLimit: 10,
+					});
+
+			init();
+			animate();
+
+			function init() {
+				var mesh, mesh2;
+
+				function webglAvailable() {
+					function create3DContext(canvas, contextAttributes) {
+					  var contextNames = ["webgl", "experimental-webgl", "webkit-3d", "moz-webgl"];
+					  for (var i = 0; i < contextNames.length; i++) {
+					    try {
+					      context = canvas.getContext(contextNames[i], contextAttributes);
+					    } catch(e) {}
+					    if (context) {
+					      break;
+					    }
+					  }
+					  return context;
+					};
+
+
+					if (!window.WebGLRenderingContext) {
+						 // browser doesn't even know WebGL
+						 return false;
+					 } else {
+						 canvas = document.createElement( 'canvas' );
+						 create3DContext(canvas);
+						 if (!context) {
+							 return false;
+						 } else {
+							 return true;
+						 }
+					 }
+				}
+
+				if ( webglAvailable() ) {
+					// renderer = new THREE.WebGLRenderer({
+					// 	// alpha: true,
+					// 	canvas: canvas, preserveDrawingBuffer: true,
+					// 	// antialias: true , clearColor: 0xffffff, clearAlpha: 1
+					// });
+					renderer = new THREE.WebGLRenderer({
+						canvas: canvas,
+						antialias: true,
+						preserveDrawingBuffer: true,
+						alpha: true,
+					});
+
+					// alert("webgl available!");
+				} else {
+					alert("webgl NOT available!");
+					renderer = new THREE.CanvasRenderer({ alpha: true });
+				}
+				renderer.setSize(
+window.innerWidth, window.innerHeight
+// 3840, 2160
+);
+				renderer.setClearColor(0x000000, 1);
+				// renderer.autoClear = false;
+				// renderer.clear();
+
+				// renderer.shadowMapEnabled = true;
+
+				container = document.getElementById( 'container' );
+				container.appendChild( renderer.domElement );
+
+				// camera = new THREE.PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 1, 1000 );
+				camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 0.001, 700);
+				camera.position.z = 70;
+
+				// effect = new THREE.StereoEffect( renderer );
+				// effect.setSize( window.innerWidth, window.innerHeight );
+
+				controls = new THREE.OrbitControls(camera, renderer.domElement);
+				// controls.target.set(
+				//   camera.position.x + 0.15,
+				//   camera.position.y,
+				//   camera.position.z
+				// );
+				controls.enablePan = true;
+				controls.enableZoom = true;
+
+				// controls = new THREE.OrbitControls( camera, renderer.domElement );
+				// controls.addEventListener( 'change', clearRenderer ); // remove when using animation loop
+				// // enable animation loop when using damping or autorotation
+				// controls.enableDamping = true;
+				// controls.dampingFactor = 1;
+				// // controls.enableZoom = false
+				// controls.autoRotate = true;
+				// controls.autoRotateSpeed = 16;
+
+
+				scene = new THREE.Scene();
+				// scene.fog = new THREE.Fog(0xffffff, 10, 60);
+    		// scene.fog.color.setHSL( 0.51, 0.6, 0.6 );
+				// scene.fog=new THREE.FogExp2( 0xffddff, 0.001 );
+        // scene.fog = new THREE.Fog(0xff11aa, 1.00, 1);
+				// scene.fog = new THREE.FogExp2( 0xCCCFFF, 0.007 );
+
+				// var ambient = new THREE.AmbientLight( 0xffffff );
+				// scene.add(ambient);
+				//
+				// var light = new THREE.DirectionalLight( 0xff0000 );
+				// light.position = camera.position;
+				// scene.add(light);
+
+				// fallback();
+				window.addEventListener('deviceorientation', setOrientationControls, true);
+
+				renderer.domElement.addEventListener('click', function(){
+				  // using HTML5 for fullscreen (only newest Chrome + FF)
+				  canvas.webkitRequestFullScreen(Element.ALLOW_KEYBOARD_INPUT); //Chrome
+				  // canvas.mozRequestFullScreen(); //Firefox
+				}, false);
+
+				document.addEventListener( 'mousemove', onDocumentMouseMove, false );
+
+				// IE9, Chrome, Safari, Opera
+				document.addEventListener("mousewheel", onDocumentMouseWheel, false);
+				// Firefox
+				document.addEventListener("DOMMouseScroll", onDocumentMouseWheel, false);
+
+				window.addEventListener( 'resize', onWindowResize, false );
+			}
+
+			function setOrientationControls(e) {
+				if (!e.alpha) {
+			    return;
+			  }
+				// alert("AAA");
+				// console.log("AAA");
+				controls = new THREE.DeviceOrientationControls(camera);
+				// controls.connect();
+				// controls.update();
+				// camera.position.set(0, 0, 0);
+
+				window.removeEventListener('deviceorientation', setOrientationControls, true);
+			}
+
+			function onWindowResize() {
+				windowHalfX = window.innerWidth / 2;
+				windowHalfY = window.innerHeight / 2;
+
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				// effect.setSize( window.innerWidth, window.innerHeight );
+			}
+
+			function onDocumentMouseMove( event ) {
+				mouseX = ( event.clientX - windowHalfX );
+				mouseY = ( event.clientY - windowHalfY );
+			}
+
+			function onDocumentMouseWheel( event ) {
+					// cross-browser wheel delta
+					var e = window.event || event; // old IE support
+					var delta = Math.max(-1, Math.min(1, (event.wheelDelta || -event.detail)));
+					radius = Math.max(minRadius, Math.min(maxRadius, radius + (radiusStep * delta)));
+					// console.log(radius);
+					return false;
+
+			}
+
+			function animate() {
+				requestAnimationFrame( animate );
+				controls.update();
+				render();
+			}
+
+			// var angle=0;
+			// var clamp = 1;
+			// var cache = [];
+			// capturer.start();
+
+			function clearRenderer() {
+					renderer.clear();
+			}
+
+			function render() {
+				// console.log(angle);
+
+				// if (frame <=frames) {
+				// if (frame++ % clamp == 0) {
+				// 	console.log("frame " + frame);
+				frame++;
+				fallback();
+				// frame++;
+				// };
+				// camera.position.x = ( mouseX ) * 1;
+				// camera.position.y = ( mouseY ) * 1;
+				// camera.position.z = Math.sin(angle) * radius;
+				// camera.position.x = Math.cos(angle) * radius;
+				// angle += 0.1;
+				// camera.position.z = 1;
+
+				// materialTextured.alphaMap.needsUpdate = true;
+
+				// mesh2Arr.map( function(mesh2) {
+				// 	mesh2.material.alphaMap.needsUpdate = true;
+				// });
+
+				// camera.position.z = -radius;
+				// camera.lookAt( scene.position );
+
+				// renderer.clearTarget( null, false, true );
+				// renderer.clear();
+				renderer.render( scene, camera );
+				// effect.render( scene, camera );
+
+				capturer.capture( canvas );
+			// } else {
+			// 		capturer.stop();
+			// 		capturer.save();
+			// 	}
+			}
+
+			var limitScaleMin =2;
+			var limitScaleMax = limitScaleMin + 1;
+			var scale;
+
+			var size = 10;
+			var rangeStep = 3;
+
+var PI = Math.PI;
+var PHI = 1.61803398875;
+
+			// var off = 0;
+			// var offAnim = 0;
+
+			function fallback() {
+				// function fibo(n) {
+				//  if (n <= 1) {
+				//   return n;
+				//  }
+				//  fibo = 1;
+				//  fiboPrev = 1;
+				//  for ( i = 2; i < n; ++i) {
+				//   temp = fibo;
+				//   fibo += fiboPrev;
+				//   fiboPrev = temp;
+				//  }
+				//  return fibo;
+				// }
+				// var limitScale = 100;
+				// var scale;
+				//
+				// var size = 10;
+				// var rangeStep = 10;
+				// var off = 0;
+				// offAnim = (offAnim > 6 ? 0 : offAnim + 0.1);
+// offAnim+=0.01;
+offAnim = gain;
+off = gain;
+rangeStep = Math.max(1, gain);
+// size = gain / 10;
+
+
+				// while(scene.children.length > 0){ scene.remove(scene.children[0]); }
+
+				// scene = new THREE.Scene();
+				// rangeStep = (rangeStep > 20 ? 1 : rangeStep + 0.01);
+				// off =  Math.sin(frames - frame) + Math.cos(frame);
+				// off += 0.00000001;
+				// off =  frame / frames;
+				// rangeStep=rangeStep+0.1;
+				// off = fibo(off);
+				// rangeStep+=1;
+				var dataWidth = size;
+				var quasicrystal = combine(d3.range(0, PHI, PHI/rangeStep).map(wave));
+				var geometry = new THREE.Geometry();
+				for (var z=0; z<dataWidth/dataWidth; z++) {
+				 for (var y=0; y<dataWidth; y++) {
+						for (var x=0; x<dataWidth; x++) {
+							var d = quasicrystal(tx(x), ty(y), tz(z));
+							scale = d*gain/200;//+Math.sin(off);
+// camera.position.z = d*gain;
+								// var scale = Math.cos(d);
+								// geometry2 = new THREE.CubeGeometry( 3*d, 3*d, 3*d);
+
+								// geometry2 = new THREE.CubeGeometry( scale, scale, scale, 0, 0, 0);
+								// geometry2 = new THREE.CubeGeometry( d, d, d, 0, 0, 0);
+								// geometry = new THREE.SphereGeometry( scale*1, scale*1, scale*1);
+								// geometry2 = new THREE.SphereGeometry( d, 8*d, 6*d);
+								// geometry = new THREE.SphereGeometry( 1, 1, 1);
+								// geometry = new THREE.CubeGeometry( 1, 1, 1);
+
+
+	var v = new THREE.Vector3( scale*tx(x), scale*ty(y), scale*tz(z) );
+	geometry.vertices.push( v );
+
+						 }
+					 }
+}
+
+var line = new MeshLine();
+line.setGeometry(
+geometry , function( p ) { return scale + Math.sin( 5 * p ); } );
+
+var material = new MeshLineMaterial({
+	// sizeAttenuation: true,
+	lineWidth: Math.max(1, scale),
+	color: new THREE.Color(gain*scale),
+	// wireframe: true
+	transparent: true,
+	opacity: gain,
+	depthTest: false,
+	blending: THREE.CustomBlending,
+	// map: texture,
+	// useMap: 1,
+	dashArray: 10,
+	resolution: v,
+	sizeAttenuation: 1,
+	near: 0,
+	far: 1000,
+	repeat: v//new THREE.Vector2(PHI, PHI/rangeStep)
+});
+
+material.blendEquation =
+// THREE.AddEquation; //default
+THREE.SubtractEquation;
+material.blendSrc =
+// THREE.SrcAlphaFactor; //default
+THREE.SrcAlphaSaturateFactor;
+material.blendDst =
+//THREE.OneMinusSrcAlphaFactor; //default
+THREE.OneFactor;
+
+var mesh2 = new THREE.Mesh( line.geometry, material );
+
+						if (scene.children.length < numChildren) {
+							group = new THREE.Object3D();
+							// group.add( mesh );
+							group.add( mesh2 );
+							scene.add( group );
+						} else {
+// console.log(index % numChildren);
+// if (index >= numChildren) {
+// index = 0;
+// }
+							group = scene.children[index++ % numChildren];
+							group.children[0] = mesh2;
+						}
+
+					function wave(theta) {
+						var c = Math.cos(theta),
+								s = Math.sin(theta),
+								t = PHI % Math.cos(theta) * Math.sin(theta);
+								// t = Math.tan(theta);//PHI*2;
+						return function(x, y, z) {
+							return (Math.cos(c * x) + Math.cos(s * y) - Math.tan(t * z) + off);
+							// return (Math.cos(c * x + s * y + t * z) + off);
+							// return (Math.cos(c * x - s * y - t * z) + off);
+						};
+					}
+
+					function combine(fs) {
+						var n = fs.length;
+						return function(x, y, z) {
+							var s = 0,
+									i = -1;
+							while (++i < n) {
+								s += fs[i](x, y, z);
+							}
+							var v = s % 10,
+									// k = s + v + offAnim;
+									k = s + v * offAnim;
+							return (k & 1) === 0 ? v : 1-v;
+							// return (k) === 0 ? v : 4-v;
+						};
+					}
+
+					function tx(x) {
+						return (x - size / 2);
+					}
+
+					function ty(y) {
+						return (y - size / 2);
+					}
+
+					function tz(z) {
+						return (z - size / 2);
+					}
+			}
+
+		</script>
+	</body>
+</html>

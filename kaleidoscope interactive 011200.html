@@ -1,0 +1,508 @@
+<!--
+localhost/stereo/globeStereo3-131i-opt2.html
+-->
+<!DOCTYPE html>
+<html lang="en">
+<head>
+		<title>3D Globe with Map Image in WebGL using Three.js | TechSlides</title>
+		<meta charset="utf-8">
+		<meta name="viewport" content="width=device-width, user-scalable=no, minimum-scale=1.0, maximum-scale=1.0">
+
+		<script type="text/javascript" src="ccapture.js-master/build/CCapture.all.min.js"></script>
+	</head>
+	<body>
+
+		<div id="container"></div>
+
+		<script src="d3.v3.min.js"></script>
+
+		<script src="../three.js/build/three.js"></script>
+		<script src="../three.js/examples/js/renderers/CanvasRenderer.js"></script>
+		<script src="../three.js/examples/js/renderers/Projector.js"></script>
+		<script src="../three.js/examples/js/controls/OrbitControls.js"></script>
+		<script src="StereoEffect.js"></script>
+		<script src="../three.js/examples/js/controls/DeviceOrientationControls.js"></script>
+
+
+		<script>
+			var canvas, context;
+			var container;
+			var camera, scene, renderer;
+			var group;
+			var mouseX = 0, mouseY = 0, mouseWheel = 0;
+			var controls;
+
+			var windowHalfX = window.innerWidth / 2;
+			var windowHalfY = window.innerHeight / 2;
+
+			var mesh2Arr = [];
+			var geometry, geometry2;
+			//
+
+var texturePath =
+'4_birds_5.gif';
+// 'shadow2.gif';
+			var textureLoader = new THREE.TextureLoader()
+				.setPath( 'img/' )
+				// .load('jsgif11.gif');
+.load(texturePath);
+				//.setPath( 'Pictures/' )
+				//.load('ccapturecrystal (2).gif');
+			// textureLoader.minFilter = THREE.LinearFilter;
+			//
+			var textureLoader2 = new THREE.CubeTextureLoader()
+				.setPath( 'img/' )
+				.load( [
+texturePath,texturePath,texturePath,texturePath,texturePath,texturePath
+			// 		'crystalsnew20ii.gif',
+			// 		'crystalsnew20ii.gif',
+			// 		'crystalsnew20ii.gif',
+			// 		'crystalsnew20ii.gif',
+			// 		'crystalsnew20ii.gif',
+			// 		'crystalsnew20ii.gif'
+				] );
+			// textureLoader2.minFilter = THREE.LinearFilter;
+
+
+			// var imgPath = "img/qcrystal11-1fps2.gif";
+			// var texture = THREE.ImageUtils.loadTexture(imgPath);
+			// // texture.minFilter = THREE.LinearFilter; // disables gif animation
+			//
+			// var urls = [
+			// 	imgPath,
+			// 	imgPath,
+			// 	imgPath,
+			// 	imgPath,
+			// 	imgPath,
+			// 	imgPath
+			// ];
+			// var textureCube = THREE.ImageUtils.loadTextureCube(urls);
+			// textureCube.minFilter = THREE.LinearFilter;
+
+			var maxRadius = 30;
+			var minRadius = 10;
+			var radiusStep = 4;
+			var radius = maxRadius;//(maxRadius;// - minRadius) / 2;
+
+			var frame = 0;
+			var frames = 512;
+
+			// Create a capturer that exports an animated GIF
+			// Notices you have to specify the path to the gif.worker.js
+			// var capturer = new CCapture({
+			// 	format: 'gif', workersPath: 'ccapture.js-master/src/',
+			// 	framerate: 6,
+			// 	// verbose: true,
+			// 	// display: true,
+			// 	name: "ccapturecrystal"
+			//
+			// 	// timeLimit: 10,
+			// 		});
+
+			init();
+			animate();
+
+			function init() {
+				var mesh, mesh2;
+
+				function webglAvailable() {
+					function create3DContext(canvas, contextAttributes) {
+					  var contextNames = ["webgl", "experimental-webgl", "webkit-3d", "moz-webgl"];
+					  for (var i = 0; i < contextNames.length; i++) {
+					    try {
+					      context = canvas.getContext(contextNames[i], contextAttributes);
+					    } catch(e) {}
+					    if (context) {
+					      break;
+					    }
+					  }
+					  return context;
+					};
+
+
+					if (!window.WebGLRenderingContext) {
+						 // browser doesn't even know WebGL
+						 return false;
+					 } else {
+						 canvas = document.createElement( 'canvas' );
+						 create3DContext(canvas);
+						 if (!context) {
+							 return false;
+						 } else {
+							 return true;
+						 }
+					 }
+				}
+
+				if ( webglAvailable() ) {
+					// renderer = new THREE.WebGLRenderer({
+					// 	// alpha: true,
+					// 	canvas: canvas, preserveDrawingBuffer: true,
+					// 	// antialias: true , clearColor: 0xffffff, clearAlpha: 1
+					// });
+					renderer = new THREE.WebGLRenderer({
+						// antialias: true, preserveDrawingBuffer: true,
+						alpha: true,
+					});
+
+					// alert("webgl available!");
+				} else {
+					alert("webgl NOT available!");
+					renderer = new THREE.CanvasRenderer({ alpha: true });
+				}
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				renderer.setClearColor(0x000000, 1);
+				// renderer.autoClear = false;
+				// renderer.clear();
+
+				// renderer.shadowMapEnabled = true;
+
+				container = document.getElementById( 'container' );
+				container.appendChild( renderer.domElement );
+
+				// camera = new THREE.PerspectiveCamera( 60, window.innerWidth / window.innerHeight, 1, 1000 );
+				camera = new THREE.PerspectiveCamera(90, window.innerWidth / window.innerHeight, 0.001, 10000);
+				camera.position.z = 1;
+
+				effect = new THREE.StereoEffect( renderer );
+				effect.setSize( window.innerWidth, window.innerHeight );
+
+				controls = new THREE.OrbitControls(camera, renderer.domElement);
+				// controls.target.set(
+				//   camera.position.x + 0.15,
+				//   camera.position.y,
+				//   camera.position.z
+				// );
+				controls.enablePan = true;
+				controls.enableZoom = true;
+
+				// controls = new THREE.OrbitControls( camera, renderer.domElement );
+				// controls.addEventListener( 'change', clearRenderer ); // remove when using animation loop
+				// // enable animation loop when using damping or autorotation
+				// controls.enableDamping = true;
+				// controls.dampingFactor = 1;
+				// // controls.enableZoom = false
+				// controls.autoRotate = true;
+				// controls.autoRotateSpeed = 1;
+
+
+				scene = new THREE.Scene();
+				// scene.fog = new THREE.Fog(0xffffff, 10, 60);
+    		// scene.fog.color.setHSL( 0.51, 0.6, 0.6 );
+				// scene.fog=new THREE.FogExp2( 0xffddff, 0.001 );
+        // scene.fog = new THREE.Fog(0xff11aa, 1.00, 1);
+				// scene.fog = new THREE.FogExp2( 0xCCCFFF, 0.007 );
+scene.background = textureLoader2;
+				// var ambient = new THREE.AmbientLight( 0xffffff );
+				// scene.add(ambient);
+
+				// var light = new THREE.DirectionalLight( 0xFFFFFF );
+				// light.position = camera.position;
+				// scene.add(light);
+
+				// fallback();
+				window.addEventListener('deviceorientation', setOrientationControls, true);
+//
+// 				renderer.domElement.addEventListener('click', function(){
+// 				  // using HTML5 for fullscreen (only newest Chrome + FF)
+// 				  document.body.webkitRequestFullScreen(Element.ALLOW_KEYBOARD_INPUT); //Chrome
+// 				  // canvas.mozRequestFullScreen(); //Firefox
+// // if (canvas.requestFullscreen) {
+// //   canvas.requestFullscreen();
+// // }
+// 				}, false);
+
+				document.addEventListener( 'mousemove', onDocumentMouseMove, false );
+
+				// IE9, Chrome, Safari, Opera
+				document.addEventListener("mousewheel", onDocumentMouseWheel, false);
+				// Firefox
+				document.addEventListener("DOMMouseScroll", onDocumentMouseWheel, false);
+
+				window.addEventListener( 'resize', onWindowResize, false );
+			}
+
+			function setOrientationControls(e) {
+				if (!e.alpha) {
+			    return;
+			  }
+				// alert("AAA");
+				// console.log("AAA");
+				controls = new THREE.DeviceOrientationControls(camera);
+				// controls.connect();
+				// controls.update();
+				// camera.position.set(0, 0, 0);
+
+				window.removeEventListener('deviceorientation', setOrientationControls, true);
+			}
+
+			function onWindowResize() {
+				windowHalfX = window.innerWidth / 2;
+				windowHalfY = window.innerHeight / 2;
+
+				camera.aspect = window.innerWidth / window.innerHeight;
+				camera.updateProjectionMatrix();
+
+				renderer.setSize( window.innerWidth, window.innerHeight );
+				effect.setSize( window.innerWidth, window.innerHeight );
+			}
+
+			function onDocumentMouseMove( event ) {
+				mouseX = ( event.clientX - windowHalfX );
+				mouseY = ( event.clientY - windowHalfY );
+			}
+
+			function onDocumentMouseWheel( event ) {
+					// cross-browser wheel delta
+					var e = window.event || event; // old IE support
+					var delta = Math.max(-1, Math.min(1, (event.wheelDelta || -event.detail)));
+					radius = Math.max(minRadius, Math.min(maxRadius, radius + (radiusStep * delta)));
+					// console.log(radius);
+					return false;
+
+			}
+
+			function animate() {
+				requestAnimationFrame( animate );
+				controls.update();
+				render();
+			}
+
+			// var angle=0;
+			// var clamp = 1;
+			// var cache = [];
+			// capturer.start();
+
+			function clearRenderer() {
+					renderer.clear();
+			}
+
+			function render() {
+				// console.log(angle);
+
+				// if (frame <=frames) {
+				// if (frame++ % clamp == 0) {
+				// 	console.log("frame " + frame);
+				frame++;
+				fallback();
+				// frame++;
+				// };
+				// camera.position.x = ( mouseX ) * 1;
+				// camera.position.y = ( mouseY ) * 1;
+				// camera.position.z = Math.sin(angle) * radius;
+				// camera.position.x = Math.cos(angle) * radius;
+				// angle += 0.1;
+				// camera.position.z = 1;
+
+				mesh2Arr.map( function(mesh2) {
+					mesh2.material.map.needsUpdate = true;
+				});
+// scene.background.needsUpdate = true;
+
+				// camera.position.z = -radius;
+				// camera.lookAt( scene.position );
+
+				// renderer.clearTarget( null, false, true );
+				// renderer.clear();
+				renderer.render( scene, camera );
+				// effect.render( scene, camera );
+
+				// capturer.capture( canvas );
+			// } else {
+				// if (frame++ ==frames) {
+				// alert("stop");
+					// capturer.stop();
+						// capturer.save();
+				// }
+			}
+
+			var limitScaleMin =2;
+			var limitScaleMax = limitScaleMin + 1;
+			var scale;
+
+			var size = 5;
+			var rangeStep = 4;
+			var off = 0;
+			var off2 = 1;
+
+
+
+			function fallback() {
+				// function fibo(n) {
+				//  if (n <= 1) {
+				//   return n;
+				//  }
+				//  fibo = 1;
+				//  fiboPrev = 1;
+				//  for ( i = 2; i < n; ++i) {
+				//   temp = fibo;
+				//   fibo += fiboPrev;
+				//   fiboPrev = temp;
+				//  }
+				//  return fibo;
+				// }
+				// var limitScale = 100;
+				// var scale;
+				//
+				// var size = 10;
+				// var rangeStep = 10;
+				// var off = 0;
+
+				// while(scene.children.length > 0){ scene.remove(scene.children[0]); }
+
+				// scene = new THREE.Scene();
+				// rangeStep = (rangeStep > 9 ? 1 : rangeStep + .01);
+				// off =  Math.sin(frames - frame) + Math.cos(frame);
+				// off2 += Math.sin(frame)*10;
+				// rangeStep = 3+ Math.PI * Math.sin(frame / frames);
+				// rangeStep=rangeStep+Math.sin(frame / frames);
+				// off = fibo(off);
+				// rangeStep=rangeStep+0.1;
+				// camera.position.set(0,0,0);
+// camera.up = new THREE.Vector3(0,0,1);
+// camera.lookAt(new THREE.Vector3(0,0,0));
+
+				var dataWidth = size;
+				var quasicrystal = combine(d3.range(0, Math.PI, Math.PI/rangeStep).map(wave));
+				for (var z=0; z<dataWidth; z++) {
+				 for (var y=0; y<dataWidth; y++) {
+						for (var x=0; x<dataWidth; x++) {
+							var d = quasicrystal(tx(x), ty(y), tz(z));
+							scale = d*10;//+Math.sin(off);
+
+							if (scene.children.length < (dataWidth*dataWidth*dataWidth)) {
+								// var scale = Math.cos(d);
+								// geometry2 = new THREE.CubeGeometry( 3*d, 3*d, 3*d);
+
+								geometry2 = new THREE.CubeGeometry( scale, scale, scale, 0, 0, 0);
+								// geometry2 = new THREE.CubeGeometry( d, d, d, 0, 0, 0);
+								// geometry2 = new THREE.SphereGeometry( scale*10, scale*10, scale*10);
+								// geometry2 = new THREE.SphereGeometry( 0, 0, 0);
+								// geometry2 = new THREE.SphereGeometry( 1, 1, 1);
+								// geometry2 = new THREE.CubeGeometry( .051, .051, .051);
+
+								// 	// color: 0x0000ff*d,
+								// 	// color: new THREE.Color((x-dataWidth/2), (y-dataWidth/2), d),
+								// 	// color: new THREE.Color(1/d, 1/d, 1/d),
+
+// var material = new THREE.MeshBasicMaterial( {
+// color: 0xffffff*scale,
+// // color: 0xffffff,
+// // wireframe: true,
+// transparent: true,
+// opacity:1
+// // side: THREE.DoubleSide
+// })
+//
+// material.blending = THREE.CustomBlending;
+// material.blendEquation = THREE.SubtractEquation; //default
+// material.blendSrc = THREE.OneMinusDstColorFactor; //default
+// material.blendDst = THREE.OneMinusDstAlphaFactor; //default
+
+var materialTextured = new THREE.MeshBasicMaterial( {
+	color: 0xffffff,
+	transparent: true,
+	// opacity:0.5,
+	// alphaMap: textureLoader,
+	// envMap: textureLoader,
+	map: textureLoader,
+	// alphaMap: textureLoader,
+	// envMap: textureCube,
+	// side: THREE.DoubleSide
+});
+
+// materialTextured.blending = THREE.CustomBlending;
+// materialTextured.blendEquation = THREE.SubtractEquation; //default
+// materialTextured.blendSrc = THREE.OneMinusDstColorFactor; //default
+// materialTextured.blendDst = THREE.OneMinusDstAlphaFactor; //default
+
+								mesh2 = new THREE.Mesh( geometry2, materialTextured);
+
+								mesh2Arr.push(mesh2);
+								// mesh2.material.color.setHex(0xffffff*scale);
+
+								group = new THREE.Object3D();
+								// group.add( mesh );
+								group.add( mesh2 );
+								scene.add( group );
+
+							} else {
+								group = scene.children[z*dataWidth*dataWidth+y*dataWidth+x];
+							}
+
+							// if (scale > limitScaleMin && scale < limitScaleMax) {
+								group.position.x = (x-dataWidth/2)*d/off2;//*scale;
+								group.position.y = (y-dataWidth/2)*d/off2;//*scale;
+								group.position.z = (z-dataWidth/2)*d/off2;
+								// group.position.x = 0;
+								// group.position.y = 0;
+								// group.position.z = 0;
+								// group.translateX((x-dataWidth/2)*d);
+								// group.translateY((y-dataWidth/2)*d);
+								// 	// group.translateZ(d);
+								// group.translateZ((z-dataWidth/2)*d);
+
+								group.rotateX((x-dataWidth/2)*d/1000);
+								group.rotateY((y-dataWidth/2)*d/1000);
+								group.rotateZ((z-dataWidth/2)*d/1000);
+
+								// group.scale.set(d, d, d, d);
+							// } else {
+							// 	group.translateX((x-dataWidth/2)*d);
+							// 	group.translateY((y-dataWidth/2)*d);
+							// 	group.translateZ((z-dataWidth/2)*d);
+							// }
+						 }
+					 }
+					}
+
+					function wave(theta) {
+						var c = Math.cos(theta),
+								s = Math.sin(theta),
+								// t = Math.PI % Math.cos(theta) * Math.sin(theta);
+								t = Math.sin(theta);
+						return function(x, y, z) {
+							return (Math.cos(c * x) + Math.cos(s * y) - Math.tan(t * z) + off);
+							// return (Math.cos(c * x + s * y + t * z) + off);
+							// return (Math.cos(c * x - s * y - t * z) + off);
+						};
+					}
+
+					// function wave(theta) {
+				  //   var c = Math.cos(theta),
+				  //       s = Math.sin(theta);
+				  //   return function(x, y) {
+				  //     return (Math.cos(c * x - s * y)+ off);
+				  //   };
+				  // }
+
+					function combine(fs) {
+						var n = fs.length;
+						return function(x, y, z) {
+							var s = 0,
+									i = -1;
+							while (++i < n) {
+								s += fs[i](x, y, z);
+							}
+							var v = s % 1,
+									k = s + v;
+							return (k & 1) === 0 ? v : 1-v;
+						};
+					}
+
+					function tx(x) {
+						return (x - size / 2);
+					}
+
+					function ty(y) {
+						return (y - size / 2);
+					}
+
+					function tz(z) {
+						return (z - size / 2);
+					}
+			}
+
+		</script>
+	</body>
+</html>
